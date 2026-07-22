@@ -10,7 +10,7 @@ export function useChat() {
     {
       id: 'welcome',
       sender: 'ai',
-      text: `Hello! Welcome to **${APP_NAME}**. How can I help you today?`
+      text: `Hello! Welcome to **${APP_NAME}**. How can I assist you with your code today?`
     }
   ]);
 
@@ -32,14 +32,18 @@ export function useChat() {
     const userMsgId = Date.now().toString();
     const aiMsgId = (Date.now() + 1).toString();
 
+    // 1. Add User Message and empty AI Placeholder Message
     setMessages((prev) => [
       ...prev,
-      { id: userMsgId, sender: 'user', text: promptText }
+      { id: userMsgId, sender: 'user', text: promptText },
+      { id: aiMsgId, sender: 'ai', text: '' } // Placeholder for streaming text
     ]);
+    
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+      // 2. Fetch from the new Streaming Endpoint
+      const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -49,24 +53,40 @@ export function useChat() {
       });
 
       if (!response.ok) {
-        throw new Error(`Server returned status ${response.status}`);
+        throw new Error(`Server status ${response.status}`);
       }
 
-      const data = await response.json();
-      setMessages((prev) => [
-        ...prev,
-        { id: aiMsgId, sender: 'ai', text: data.response }
-      ]);
+      // 3. Obtain a ReadableStream reader
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      // 4. Read stream chunks in a loop
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunkText = decoder.decode(value, { stream: true });
+
+        // Append incoming token chunk to the target AI message in real time
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) =>
+            msg.id === aiMsgId ? { ...msg, text: msg.text + chunkText } : msg
+          )
+        );
+      }
+
     } catch (err) {
       setError(err.message);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: aiMsgId,
-          sender: 'ai',
-          text: `⚠️ **Connection Error:** Could not reach the backend API (${err.message}). Ensure FastAPI and Ollama are running.`
-        }
-      ]);
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === aiMsgId
+            ? {
+                ...msg,
+                text: `⚠️ **Connection Error:** Failed to stream response (${err.message}). Ensure FastAPI and Ollama are running.`
+              }
+            : msg
+        )
+      );
     } finally {
       setLoading(false);
     }
