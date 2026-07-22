@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import ChatFeed from './components/ChatFeed';
 import ChatComposer from './components/ChatComposer';
-
+import "./App.css"
 export default function App() {
   const {
     sidebarOpen,

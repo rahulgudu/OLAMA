@@ -1,36 +1,54 @@
 import os
 import ollama
 import chromadb
-from fastapi import FastAPI, HTTPException, status
+from neo4j import GraphDatabase
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-app = FastAPI(title="Nexus AI Backend - RAG Enabled")
+# Import our comprehensive knowledge base file
+from knowledge_base import DEVELOPER_DOCUMENTS, NEO4J_SEED_CYPHER
 
-# 1. Initialize Ollama Client
+app = FastAPI(title="Nexus AI Backend - Full Stack GraphRAG")
+
+# ==========================================
+# 1. INITIALIZE OLLAMA
+# ==========================================
 ollama_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
 ollama_client = ollama.Client(host=ollama_host)
 
-# 2. Initialize ChromaDB Vector Database
+# ==========================================
+# 2. INITIALIZE CHROMADB VECTOR DATABASE
+# ==========================================
 chroma_client = chromadb.Client()
-collection = chroma_client.get_or_create_collection(name="developer_notes")
+collection = chroma_client.get_or_create_collection(name="multi_tech_knowledge")
 
-# Populate DB with starter notes and clean reference snippets
+# Seed ChromaDB from imported dataset if empty
 if collection.count() == 0:
     collection.add(
-        documents=[
-            "FastAPI uses Pydantic models for request body validation and serialization.",
-            "In FastAPI, enable CORS directly using CORSMiddleware from fastapi.middleware.cors. Example: app.add_middleware(CORSMiddleware, allow_origins=['*'], allow_credentials=True, allow_methods=['*'], allow_headers=['*']). Never write custom middleware functions for CORS.",
-            "Ollama runs open-source LLMs locally and exposes a REST API at port 11434.",
-            "Vite + React provides a lightweight development environment for single-page apps.",
-            "Nexus AI uses Server-Sent Events (SSE) to stream tokens live to the frontend."
-        ],
-        ids=["note_1", "note_2", "note_3", "note_4", "note_5"]
+        documents=[doc["text"] for doc in DEVELOPER_DOCUMENTS],
+        ids=[doc["id"] for doc in DEVELOPER_DOCUMENTS]
     )
-    print("✅ Initialized ChromaDB with default developer notes and reference code!")
+    print(f"✅ Initialized ChromaDB Vector DB with {len(DEVELOPER_DOCUMENTS)} comprehensive tech documents!")
 
-# 3. Configure CORS
+# ==========================================
+# 3. INITIALIZE NEO4J GRAPH DATABASE
+# ==========================================
+NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password123")
+
+neo4j_driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+
+# Seed Neo4j Knowledge Graph on startup
+try:
+    neo4j_driver.execute_query(NEO4J_SEED_CYPHER)
+    print("✅ Initialized Neo4j Knowledge Graph with full tech stack entities!")
+except Exception as e:
+    print(f"⚠️ Neo4j Warning: {e}")
+
+# Enable CORS for React Frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -44,39 +62,64 @@ class ChatRequest(BaseModel):
     model: str = Field(default="qwen2.5:0.5b")
 
 # ==========================================
+# HELPER: NEO4J GRAPH RETRIEVAL
+# ==========================================
+def get_graph_context(query_text: str) -> str:
+    """Dynamic Neo4j traversal matching query keywords across tech stacks."""
+    try:
+        keywords = ["fastapi", "react", "express", "spring", "gin", "dotnet", "laravel", 
+                    "python", "javascript", "java", "golang", "c#", "php", "mongodb", "ollama", "cors"]
+        
+        matched_keyword = next((kw for kw in keywords if kw in query_text.lower()), None)
+        
+        if not matched_keyword:
+            return "No explicit tech relationship nodes matched in graph query."
+
+        query = """
+        MATCH (t:Tech)-[r]->(related)
+        WHERE toLower(t.name) CONTAINS toLower($keyword) 
+           OR toLower(related.name) CONTAINS toLower($keyword)
+        RETURN t.name AS source, type(r) AS relationship, related.name AS target
+        LIMIT 6
+        """
+
+        records, _, _ = neo4j_driver.execute_query(query, parameters_={"keyword": matched_keyword})
+        
+        if not records:
+            return "No matching relationships found."
+
+        return "\n".join([f"({r['source']}) --[{r['relationship']}]--> ({r['target']})" for r in records])
+
+    except Exception as e:
+        return f"Graph query skipped: {str(e)}"
+
+# ==========================================
 # RAG STREAMING ENDPOINT
 # ==========================================
 @app.post("/api/chat/stream")
 async def chat_stream(payload: ChatRequest):
-    """
-    1. Queries ChromaDB for relevant context.
-    2. Injects context into Ollama prompt with strict guardrails.
-    3. Streams response to React UI.
-    """
     def event_generator():
         try:
-            # Step A: Query ChromaDB Vector DB
-            search_results = collection.query(
-                query_texts=[payload.prompt],
-                n_results=2  # Retrieve top 2 matching context snippets
-            )
-            
+            # 1. Retrieve Vector Documents from ChromaDB
+            search_results = collection.query(query_texts=[payload.prompt], n_results=3)
             retrieved_docs = search_results.get("documents", [[]])[0]
-            context_str = "\n".join([f"- {doc}" for doc in retrieved_docs])
+            vector_context = "\n".join([f"- {doc}" for doc in retrieved_docs])
 
-            # Step B: Construct Context-Injected System Prompt with Strict Guardrails
+            # 2. Retrieve Graph Relations from Neo4j
+            graph_context = get_graph_context(payload.prompt)
+
+            # 3. Construct System Prompt with Context & Guardrails
             system_prompt = (
-                "You are Nexus AI, a helpful and accurate software development assistant.\n"
-                "CRITICAL RULES FOR CODE GENERATION:\n"
-                "1. Write ONLY valid, standard, working Python and FastAPI code.\n"
-                "2. NEVER invent fake classes or modules (e.g., DO NOT use CORSRequestInterceptor, CORSCustomMiddleware, or FastAPIRequest).\n"
-                "3. Use standard FastAPI built-in utilities ONLY: from fastapi.middleware.cors import CORSMiddleware.\n"
-                "4. For enabling CORS in FastAPI, the ONLY code needed is app.add_middleware(CORSMiddleware, ...).\n"
-                "5. Use the retrieved context below as your primary reference source.\n\n"
-                f"--- RETRIEVED DATABASE CONTEXT ---\n{context_str}\n-----------------------------------\n"
+                "You are Nexus AI, a expert multi-stack software engineering assistant.\n"
+                "CRITICAL INSTRUCTIONS:\n"
+                "1. Provide accurate code examples using standard, official framework patterns.\n"
+                "2. Base your response directly on the retrieved context whenever possible.\n\n"
+                f"--- 📄 VECTOR DATABASE CONTEXT (ChromaDB) ---\n{vector_context}\n\n"
+                f"--- 🕸️ KNOWLEDGE GRAPH CONTEXT (Neo4j) ---\n{graph_context}\n"
+                "-------------------------------------------\n"
             )
 
-            # Step C: Stream from Ollama
+            # 4. Stream Tokens from Ollama
             response_stream = ollama_client.chat(
                 model=payload.model,
                 messages=[
@@ -92,6 +135,6 @@ async def chat_stream(payload: ChatRequest):
                     yield content
 
         except Exception as e:
-            yield f"\n[RAG Stream Error: {str(e)}]"
+            yield f"\n[GraphRAG Stream Error: {str(e)}]"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

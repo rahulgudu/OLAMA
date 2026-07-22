@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Orange Thin Vertical Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #171715;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #f97316; /* Bright Orange */
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ea580c;
+}
+
+/* Hide horizontal scrollbar while preserving scrollability if needed */
+.no-horizontal-scrollbar::-webkit-scrollbar:horizontal {
+  display: none;
+}
