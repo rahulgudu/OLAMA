@@ -17,9 +17,10 @@ app = FastAPI(title="Nexus AI Backend - Web Crawling GraphRAG")
 # 1. INITIALIZE SERVICES
 # ==========================================
 
-# Ollama Client
+# Ollama Client (async, so token generation yields to the event loop instead of
+# blocking it — required for real token-by-token SSE streaming under FastAPI)
 ollama_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434")
-ollama_client = ollama.Client(host=ollama_host)
+ollama_client = ollama.AsyncClient(host=ollama_host)
 
 # ChromaDB Vector DB
 chroma_client = chromadb.Client()
@@ -120,7 +121,7 @@ async def chat_stream(payload: ChatRequest):
             )
 
             # Step 5: Stream Tokens from Ollama
-            response_stream = ollama_client.chat(
+            response_stream = await ollama_client.chat(
                 model=payload.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -129,7 +130,7 @@ async def chat_stream(payload: ChatRequest):
                 stream=True
             )
 
-            for chunk in response_stream:
+            async for chunk in response_stream:
                 content = chunk.get('message', {}).get('content', '')
                 if content:
                     yield content

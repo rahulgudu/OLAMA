@@ -25,3 +25,36 @@
 .no-horizontal-scrollbar::-webkit-scrollbar:horizontal {
   display: none;
 }
+
+/* Blinking cursor shown at the end of an actively-streaming assistant message */
+.typing-cursor {
+  display: inline-block;
+  width: 0.55rem;
+  height: 1.05rem;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background-color: #f97316;
+  animation: typing-blink 0.9s step-start infinite;
+}
+
+@keyframes typing-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Slow-panning gradient used by the welcome screen's animated title */
+.welcome-gradient-text {
+  background-size: 200% auto;
+  animation: gradient-pan 4s ease infinite;
+}
+
+@keyframes gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}

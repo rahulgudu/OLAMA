@@ -1,13 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { motion } from 'framer-motion';
-import { Cpu, User, Copy, Check, Terminal } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Cpu, User, Copy, Check, Terminal, Database, Share2, Globe } from 'lucide-react';
 import { APP_NAME } from '../config/constants';
 
-export default function ChatMessage({ message }) {
+const CORE_STAGES = [
+  { icon: Database, text: 'Querying ChromaDB vector memory' },
+  { icon: Share2, text: 'Traversing Neo4j knowledge graph' }
+];
+const WEB_STAGE = { icon: Globe, text: 'Crawling the live web' };
+
+function ThinkingIndicator({ searchingWeb }) {
+  const stages = searchingWeb ? [...CORE_STAGES, WEB_STAGE] : CORE_STAGES;
+  const [stageIdx, setStageIdx] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setStageIdx((i) => (i + 1) % stages.length);
+    }, 1400);
+    return () => clearInterval(id);
+  }, [stages.length]);
+
+  const { icon: StageIcon, text } = stages[stageIdx];
+
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <div className="flex gap-1">
+        <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 animate-bounce [animation-delay:-0.3s]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 animate-bounce [animation-delay:-0.15s]" />
+        <span className="w-1.5 h-1.5 rounded-full bg-gradient-to-tr from-amber-500 to-orange-500 animate-bounce" />
+      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={stageIdx}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.25 }}
+          className="flex items-center gap-1.5 text-xs font-medium text-[#a3a29c]"
+        >
+          <StageIcon className="w-3.5 h-3.5 text-orange-400" />
+          <span>{text}&hellip;</span>
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+export default function ChatMessage({ message, isStreaming = false }) {
   const isUser = message.sender === 'user';
+  const isThinking = isStreaming && !message.text;
   const [copiedCode, setCopiedCode] = useState(null);
 
   const handleCopy = (codeText, id) => {
@@ -24,7 +68,11 @@ export default function ChatMessage({ message }) {
       className={`flex gap-4 text-sm leading-relaxed items-start py-2 ${isUser ? 'justify-end' : ''}`}
     >
       {!isUser && (
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center text-white shadow-md shrink-0 mt-0.5">
+        <div
+          className={`w-8 h-8 rounded-lg bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center text-white shadow-md shrink-0 mt-0.5 ${
+            isThinking ? 'animate-pulse' : ''
+          }`}
+        >
           <Cpu className="w-4 h-4" />
         </div>
       )}
@@ -43,6 +91,8 @@ export default function ChatMessage({ message }) {
         >
           {isUser ? (
             <p className="whitespace-pre-wrap break-words">{message.text}</p>
+          ) : isThinking ? (
+            <ThinkingIndicator searchingWeb={message.searching} />
           ) : (
             <div className="prose prose-invert max-w-none break-words">
               <ReactMarkdown
@@ -117,6 +167,7 @@ export default function ChatMessage({ message }) {
               >
                 {message.text}
               </ReactMarkdown>
+              {isStreaming && <span className="typing-cursor" />}
             </div>
           )}
         </div>

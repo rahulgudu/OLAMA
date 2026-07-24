@@ -24,7 +24,7 @@ export default function App() {
     setMessages((prev) => [
       ...prev,
       { id: userMsgId, sender: 'user', text: promptText },
-      { id: aiMsgId, sender: 'assistant', text: '' }
+      { id: aiMsgId, sender: 'assistant', text: '', searching: enableWebSearch }
     ]);
 
     setLoading(true);
@@ -72,7 +72,7 @@ export default function App() {
       {/* 👈 Main Feed & Input on right */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <Header selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
-        <ChatFeed messages={messages} loading={loading} />
+        <ChatFeed messages={messages} loading={loading} onSend={handleSendMessage} />
         <ChatInput onSend={handleSendMessage} loading={loading} />
       </div>
     </div>
