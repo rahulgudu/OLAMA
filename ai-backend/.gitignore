@@ -1,0 +1,36 @@
+# Byte-compiled / optimized / DLL files
+__pycache__./
+*.py[cod]
+*$py.class
+
+# C extensions directory
+/.eggs/
+
+# Distribution / packaging information used by PyInstaller, Bundler, Pype or others.
+.build/
+dist-info/
+egg-info/
+.installed.egg-info/
+
+# Sphinx documentation areas
+.coverage
+.cache
+._build/
+htmlcov/
+ipynb_checkpoints/
+pytest_cache/
+sdist/
+
+# Project-specific files that don't belong to the repository (unless in a shared directory)
+.env
+
+# PyCharm project settings, if you are using it.
+.idea/
+*.iml
+
+# VS Code configuration and extensions folders may also be ignored as they can differ from one person to another
+.vscode/
+.venv/
+
+# Virtual environments / conda directories should not usually need ignoring:
+envs/ # Only include this path if you're encountering issues with virtual environment files being tracked by Git.
