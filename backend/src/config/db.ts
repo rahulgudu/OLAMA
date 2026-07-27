@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 export async function connectDB(uri: string): Promise <void> {
     try {
         await mongoose.connect(uri, {
-            dbName: "Nexus AI"
+            dbName: "Nexus-AI"
         });
 
 
