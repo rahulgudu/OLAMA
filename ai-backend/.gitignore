@@ -30,7 +30,6 @@ sdist/
 
 # VS Code configuration and extensions folders may also be ignored as they can differ from one person to another
 .vscode/
-.venv/
 
 # Virtual environments / conda directories should not usually need ignoring:
 envs/ # Only include this path if you're encountering issues with virtual environment files being tracked by Git.
